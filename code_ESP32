@@ -1,0 +1,80 @@
+// Blynk template and authentication details
+#define BLYNK_TEMPLATE_ID "" 
+#define BLYNK_TEMPLATE_NAME "" 
+#define BLYNK_AUTH_TOKEN ""
+
+// Include necessary libraries
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>
+
+// WiFi credentials and Blynk auth token
+char auth[] = "";    // Blynk Auth Token
+char ssid[] = "";    // WiFi SSID
+char pass[] = "";    // WiFi Password
+
+// Define pins
+#define FLAME_SENSOR_PIN 4  // Flame sensor input pin
+#define BUZZER_PIN 5        // Buzzer output pin
+#define LED_PIN 2           // LED output pin
+
+// State variables
+bool fireDetectedBefore = false; // Tracks previous fire detection
+bool buzzerEnabled = true;       // Buzzer toggle from Blynk
+bool ledEnabled = true;          // LED toggle from Blynk
+
+void setup() {
+  Serial.begin(115200);               // Start serial communication
+  pinMode(FLAME_SENSOR_PIN, INPUT);   // Set flame sensor as input
+  pinMode(BUZZER_PIN, OUTPUT);        // Set buzzer as output
+  pinMode(LED_PIN, OUTPUT);           // Set LED as output
+
+  Blynk.begin(auth, ssid, pass);      // Connect to Blynk and WiFi
+  delay(1000);
+  Serial.println("System Started");   // Log message on startup
+}
+
+void loop() {
+  Blynk.run();  // Run Blynk service
+
+  int fire = digitalRead(FLAME_SENSOR_PIN);  // Read flame sensor
+
+  if (fire == LOW) {  // Fire detected (LOW signal from sensor)
+    if (!fireDetectedBefore) {
+      Serial.println("🔥 Fire Detected!");
+      Blynk.logEvent("esp32", "🔥 Fire detected!");  // Send event to Blynk
+      fireDetectedBefore = true;
+    }
+
+    // Control buzzer and LED according to Blynk toggles
+    if (buzzerEnabled) digitalWrite(BUZZER_PIN, HIGH);
+    else digitalWrite(BUZZER_PIN, LOW);
+
+    if (ledEnabled) digitalWrite(LED_PIN, HIGH);
+    else digitalWrite(LED_PIN, LOW);
+
+  } 
+  else if (fire == HIGH && fireDetectedBefore) {  // Fire cleared
+    Serial.println("✅ Fire Cleared");
+    digitalWrite(BUZZER_PIN, LOW);  // Turn off buzzer
+    digitalWrite(LED_PIN, LOW);     // Turn off LED
+    Blynk.logEvent("esp32", "✅ Fire cleared.");  // Send clear event to Blynk
+    fireDetectedBefore = false;     // Reset state
+  }
+
+  delay(300);  // Small delay between sensor checks
+}
+
+// 🔘 Manual Control from Blynk
+
+// Blynk virtual pin V5 controls buzzer on/off
+BLYNK_WRITE(V5) {
+  buzzerEnabled = param.asInt();  // Get value from app
+  if (!buzzerEnabled) digitalWrite(BUZZER_PIN, LOW);  // Turn off if disabled
+}
+
+// Blynk virtual pin V2 controls LED on/off
+BLYNK_WRITE(V2) {
+  ledEnabled = param.asInt();  // Get value from app
+  if (!ledEnabled) digitalWrite(LED_PIN, LOW);  // Turn off if disabled
+}
